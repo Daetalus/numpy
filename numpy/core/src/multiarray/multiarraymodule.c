@@ -2150,9 +2150,14 @@ array_matrixproduct(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject* kwds)
     static PyUFuncObject *cached_npy_dot = NULL;
     int errval;
     PyObject *override = NULL;
-    PyObject *v, *a, *o = NULL;
+    PyObject *a, *b, *o = Py_None;
+    PyObject *newargs;
     PyArrayObject *ret;
     char* kwlist[] = {"a", "b", "out", NULL };
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|O", kwlist, &a, &b, &o)) {
+        return NULL;
+    }
 
     if (cached_npy_dot == NULL) {
         PyObject *module = PyImport_ImportModule("numpy.core.multiarray");
@@ -2163,8 +2168,20 @@ array_matrixproduct(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject* kwds)
         Py_DECREF(module);
     }
 
-    errval = PyUFunc_CheckOverride(cached_npy_dot, "__call__", args, kwds,
+    if (o == Py_None) {
+        if ((newargs = PyTuple_Pack(2, a, b)) == NULL) {
+            return NULL;
+        }
+    } else {
+        if ((newargs = PyTuple_Pack(3, a, b, o)) == NULL) {
+            return NULL;
+        }
+    }
+
+    errval = PyUFunc_CheckOverride(cached_npy_dot, "__call__", newargs, kwds,
                                    &override, 2);
+    Py_DECREF(newargs);
+
     if (errval) {
         return NULL;
     }
@@ -2172,9 +2189,6 @@ array_matrixproduct(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject* kwds)
         return override;
     }
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|O", kwlist, &a, &v, &o)) {
-        return NULL;
-    }
     if (o == Py_None) {
         o = NULL;
     }
@@ -2183,9 +2197,8 @@ array_matrixproduct(PyObject *NPY_UNUSED(dummy), PyObject *args, PyObject* kwds)
                         "'out' must be an array");
         return NULL;
     }
-    ret = (PyArrayObject *)PyArray_MatrixProduct2(a, v, (PyArrayObject *)o);
-    return PyArray_Return(ret);
-}
+    ret = (PyArrayObject *)PyArray_MatrixProduct2(a, b, (PyArrayObject *)o);
+    return PyArray_Return(ret);}
 
 
 static PyObject *
